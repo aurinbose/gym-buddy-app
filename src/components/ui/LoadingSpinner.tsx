@@ -1,10 +1,24 @@
-export default function LoadingSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-    const sizeMap = { sm: 'w-4 h-4', md: 'w-8 h-8', lg: 'w-12 h-12' };
+export default function LoadingSpinner() {
     return (
-        <div className="flex items-center justify-center p-8">
+        <div
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '48px',
+            }}
+        >
             <div
-                className={`${sizeMap[size]} border-2 border-gray-700 border-t-violet-500 rounded-full animate-spin`}
+                style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    border: '3px solid #252B36',
+                    borderTopColor: '#FF6B35',
+                    animation: 'spin 0.8s linear infinite',
+                }}
             />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 }

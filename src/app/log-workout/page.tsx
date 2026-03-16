@@ -2,20 +2,13 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Trash2, CheckCircle } from 'lucide-react';
-import PageHeader from '@/components/ui/PageHeader';
+import { Plus, Trash2, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Routine, RoutineExercise, Exercise } from '@/types';
 
 const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
-interface SetEntry {
-    exercise_id: string;
-    exercise_name: string;
-    set_number: number;
-    reps: number;
-    weight: number;
-}
+interface SetEntry { exercise_id: string; exercise_name: string; set_number: number; reps: number; weight: number; }
 
 function LogWorkoutForm() {
     const router = useRouter();
@@ -46,29 +39,17 @@ function LogWorkoutForm() {
     }, []);
 
     useEffect(() => {
-        if (!selectedRoutine) {
-            setRoutineExercises([]);
-            setSets([]);
-            return;
-        }
+        if (!selectedRoutine) { setRoutineExercises([]); setSets([]); return; }
         async function loadRoutineExercises() {
-            const { data } = await supabase
-                .from('routine_exercises')
-                .select('*, exercise:exercises(*)')
-                .eq('routine_id', selectedRoutine)
-                .order('order_index');
+            const { data } = await supabase.from('routine_exercises').select('*, exercise:exercises(*)').eq('routine_id', selectedRoutine).order('order_index');
             if (data) {
                 setRoutineExercises(data);
                 const routine = routines.find((r) => r.id === selectedRoutine);
                 if (routine) setWorkoutName(routine.name);
-                // Pre-populate sets
                 const initialSets: SetEntry[] = data.flatMap((re) =>
                     Array.from({ length: re.target_sets || 3 }, (_, i) => ({
-                        exercise_id: re.exercise_id,
-                        exercise_name: re.exercise?.name || '',
-                        set_number: i + 1,
-                        reps: re.target_reps || 10,
-                        weight: re.target_weight || 0,
+                        exercise_id: re.exercise_id, exercise_name: re.exercise?.name || '',
+                        set_number: i + 1, reps: re.target_reps || 10, weight: re.target_weight || 0,
                     }))
                 );
                 setSets(initialSets);
@@ -79,250 +60,172 @@ function LogWorkoutForm() {
 
     function addSet(exerciseId: string, exerciseName: string) {
         const exerciseSets = sets.filter((s) => s.exercise_id === exerciseId);
-        setSets((prev) => [
-            ...prev,
-            {
-                exercise_id: exerciseId,
-                exercise_name: exerciseName,
-                set_number: exerciseSets.length + 1,
-                reps: 10,
-                weight: 0,
-            },
-        ]);
+        setSets((prev) => [...prev, { exercise_id: exerciseId, exercise_name: exerciseName, set_number: exerciseSets.length + 1, reps: 10, weight: 0 }]);
     }
 
     function removeSet(exerciseId: string, setNumber: number) {
-        setSets((prev) =>
-            prev.filter((s) => !(s.exercise_id === exerciseId && s.set_number === setNumber))
-        );
+        setSets((prev) => prev.filter((s) => !(s.exercise_id === exerciseId && s.set_number === setNumber)));
     }
 
     function updateSet(exerciseId: string, setNumber: number, field: 'reps' | 'weight', value: number) {
-        setSets((prev) =>
-            prev.map((s) =>
-                s.exercise_id === exerciseId && s.set_number === setNumber ? { ...s, [field]: value } : s
-            )
-        );
+        setSets((prev) => prev.map((s) => s.exercise_id === exerciseId && s.set_number === setNumber ? { ...s, [field]: value } : s));
     }
 
     function addFreeExercise(exerciseId: string) {
         const exercise = allExercises.find((e) => e.id === exerciseId);
         if (!exercise) return;
         if (sets.some((s) => s.exercise_id === exerciseId)) return;
-        setSets((prev) => [
-            ...prev,
-            { exercise_id: exerciseId, exercise_name: exercise.name, set_number: 1, reps: 10, weight: 0 },
-        ]);
+        setSets((prev) => [...prev, { exercise_id: exerciseId, exercise_name: exercise.name, set_number: 1, reps: 10, weight: 0 }]);
     }
 
     async function handleSave() {
-        if (!workoutName.trim()) {
-            setError('Please enter a workout name.');
-            return;
-        }
-        setSaving(true);
-        setError('');
+        if (!workoutName.trim()) { setError('Please enter a workout name.'); return; }
+        setSaving(true); setError('');
 
-        const { data: log, error: logErr } = await supabase
-            .from('workout_logs')
-            .insert({
-                user_id: DEMO_USER_ID,
-                routine_id: selectedRoutine || null,
-                name: workoutName.trim(),
-                notes: notes.trim() || null,
-                started_at: new Date().toISOString(),
-                finished_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
+        const { data: log, error: logErr } = await supabase.from('workout_logs').insert({
+            user_id: DEMO_USER_ID, routine_id: selectedRoutine || null,
+            name: workoutName.trim(), notes: notes.trim() || null,
+            started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
+        }).select().single();
 
-        if (logErr || !log) {
-            setError('Failed to save workout. Check your Supabase connection.');
-            setSaving(false);
-            return;
-        }
+        if (logErr || !log) { setError('Failed to save workout.'); setSaving(false); return; }
 
         if (sets.length > 0) {
-            await supabase.from('workout_sets').insert(
-                sets.map((s) => ({
-                    workout_log_id: log.id,
-                    exercise_id: s.exercise_id,
-                    set_number: s.set_number,
-                    reps: s.reps,
-                    weight: s.weight || null,
-                }))
-            );
+            await supabase.from('workout_sets').insert(sets.map((s) => ({
+                workout_log_id: log.id, exercise_id: s.exercise_id,
+                set_number: s.set_number, reps: s.reps, weight: s.weight || null,
+            })));
         }
-
         setSaved(true);
-        setTimeout(() => router.push('/workouts'), 1500);
+        setTimeout(() => router.push('/history'), 1500);
     }
 
-    // Group sets by exercise
     const exerciseIds = [...new Set(sets.map((s) => s.exercise_id))];
+    const inputStyle: React.CSSProperties = { background: '#1E2430', border: '1px solid #252B36', borderRadius: 14, padding: '12px 16px', color: '#fff', fontSize: '0.9rem', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
     return (
-        <div>
-            <PageHeader title="Log Workout" subtitle="Record your training session" />
+        <div style={{ padding: '0 16px 100px' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 24, paddingBottom: 16 }}>
+                <button onClick={() => router.back()} style={{ background: '#1E2430', border: '1px solid #252B36', borderRadius: 12, padding: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#fff' }}>
+                    <ArrowLeft size={18} />
+                </button>
+                <div>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', margin: 0 }}>Log Workout</h1>
+                    <p style={{ fontSize: '0.8rem', color: '#8A91A8', margin: 0 }}>Record your session</p>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left panel */}
-                <div className="space-y-4">
-                    <div className="card p-6 space-y-4">
-                        <h2 className="text-base font-semibold text-gray-200">Session Info</h2>
-                        <div>
-                            <label className="label">Workout Name *</label>
-                            <input
-                                className="input"
-                                placeholder="e.g. Push Day, Morning Workout..."
-                                value={workoutName}
-                                onChange={(e) => setWorkoutName(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Load Routine (optional)</label>
-                            <select
-                                className="input"
-                                value={selectedRoutine}
-                                onChange={(e) => setSelectedRoutine(e.target.value)}
-                            >
-                                <option value="">— Select routine —</option>
-                                {routines.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Notes</label>
-                            <textarea
-                                className="input resize-none"
-                                rows={3}
-                                placeholder="How did it go?"
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                            />
-                        </div>
+            {/* Session info */}
+            <div className="card" style={{ padding: 16, marginBottom: 16, borderRadius: 20 }}>
+                <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#FF6B35', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Session Info</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div>
+                        <label className="label">Workout Name *</label>
+                        <input style={inputStyle} placeholder="e.g. Push Day, Morning Workout..." value={workoutName} onChange={(e) => setWorkoutName(e.target.value)} />
                     </div>
-
-                    {/* Add free exercise */}
-                    {!selectedRoutine && (
-                        <div className="card p-4">
-                            <h3 className="text-sm font-medium text-gray-300 mb-3">Add Exercise</h3>
-                            <select
-                                className="input text-sm"
-                                onChange={(e) => addFreeExercise(e.target.value)}
-                                defaultValue=""
-                            >
-                                <option value="" disabled>
-                                    Select exercise...
-                                </option>
-                                {allExercises.map((e) => (
-                                    <option key={e.id} value={e.id}>
-                                        {e.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                    <div>
+                        <label className="label">Load Routine (optional)</label>
+                        <select style={{ ...inputStyle, appearance: 'none' }} value={selectedRoutine} onChange={(e) => setSelectedRoutine(e.target.value)}>
+                            <option value="">— Select routine —</option>
+                            {routines.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="label">Notes</label>
+                        <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 64 }} placeholder="How did it go?" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                    </div>
                 </div>
+            </div>
 
-                {/* Right panel - Sets */}
-                <div className="lg:col-span-2 space-y-4">
-                    {exerciseIds.length === 0 ? (
-                        <div className="card p-10 text-center border-2 border-dashed border-gray-700">
-                            <p className="text-gray-500 text-sm">
-                                {selectedRoutine
-                                    ? 'Loading exercises...'
-                                    : 'Select a routine or add exercises manually'}
-                            </p>
-                        </div>
-                    ) : (
-                        exerciseIds.map((exerciseId) => {
-                            const exerciseSets = sets.filter((s) => s.exercise_id === exerciseId);
-                            const exerciseName = exerciseSets[0]?.exercise_name;
-                            return (
-                                <div key={exerciseId} className="card p-5">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-semibold text-gray-100">{exerciseName}</h3>
-                                        <button
-                                            onClick={() => addSet(exerciseId, exerciseName)}
-                                            className="text-xs btn-secondary py-1.5 px-3"
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                            Add Set
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="grid grid-cols-12 gap-2 px-1 mb-1">
-                                            <span className="col-span-2 text-xs text-gray-500">Set</span>
-                                            <span className="col-span-4 text-xs text-gray-500">Reps</span>
-                                            <span className="col-span-4 text-xs text-gray-500">Weight (kg)</span>
-                                            <span className="col-span-2" />
-                                        </div>
-                                        {exerciseSets.map((set) => (
-                                            <div
-                                                key={`${exerciseId}-${set.set_number}`}
-                                                className="grid grid-cols-12 gap-2 items-center bg-gray-800/40 rounded-lg px-2 py-1.5"
-                                            >
-                                                <span className="col-span-2 text-sm text-gray-400 font-medium text-center">
-                                                    {set.set_number}
-                                                </span>
-                                                <input
-                                                    type="number"
-                                                    className="col-span-4 input py-1.5 text-sm text-center"
-                                                    value={set.reps}
-                                                    min={0}
-                                                    onChange={(e) =>
-                                                        updateSet(exerciseId, set.set_number, 'reps', Number(e.target.value))
-                                                    }
-                                                />
-                                                <input
-                                                    type="number"
-                                                    className="col-span-4 input py-1.5 text-sm text-center"
-                                                    value={set.weight}
-                                                    min={0}
-                                                    step={2.5}
-                                                    onChange={(e) =>
-                                                        updateSet(exerciseId, set.set_number, 'weight', Number(e.target.value))
-                                                    }
-                                                />
-                                                <button
-                                                    onClick={() => removeSet(exerciseId, set.set_number)}
-                                                    className="col-span-2 flex justify-center text-gray-600 hover:text-red-400 transition-colors"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
+            {/* Add exercise (free mode) */}
+            {!selectedRoutine && (
+                <div className="card" style={{ padding: 16, marginBottom: 16, borderRadius: 20 }}>
+                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#FF6B35', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Add Exercise</p>
+                    <select style={{ ...inputStyle, appearance: 'none' }} onChange={(e) => addFreeExercise(e.target.value)} defaultValue="">
+                        <option value="" disabled>Select exercise...</option>
+                        {allExercises.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                </div>
+            )}
+
+            {/* Sets */}
+            {exerciseIds.length === 0 ? (
+                <div style={{ border: '2px dashed #252B36', borderRadius: 20, padding: '40px 24px', textAlign: 'center' }}>
+                    <p style={{ color: '#8A91A8', fontSize: '0.85rem', margin: 0 }}>
+                        {selectedRoutine ? 'Loading exercises...' : 'Select a routine or add exercises manually'}
+                    </p>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {exerciseIds.map((exerciseId) => {
+                        const exerciseSets = sets.filter((s) => s.exercise_id === exerciseId);
+                        const exerciseName = exerciseSets[0]?.exercise_name;
+                        return (
+                            <div key={exerciseId} className="card" style={{ padding: 16, borderRadius: 20 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', margin: 0 }}>{exerciseName}</p>
+                                    <button
+                                        onClick={() => addSet(exerciseId, exerciseName)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,107,53,0.12)', border: 'none', borderRadius: 99, padding: '6px 12px', cursor: 'pointer', color: '#FF6B35', fontWeight: 600, fontSize: '0.75rem' }}
+                                    >
+                                        <Plus size={12} /> Set
+                                    </button>
                                 </div>
-                            );
-                        })
-                    )}
-
-                    {error && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">
-                            {error}
-                        </div>
-                    )}
-
-                    {saved ? (
-                        <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 font-medium">
-                            <CheckCircle className="w-5 h-5" />
-                            Workout saved! Redirecting...
-                        </div>
-                    ) : (
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="btn-primary w-full justify-center py-3 text-base"
-                        >
-                            {saving ? 'Saving...' : 'Finish & Save Workout'}
-                        </button>
-                    )}
+                                <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 32px', gap: '6px 8px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.7rem', color: '#5A6175', fontWeight: 600 }}>#</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#5A6175', fontWeight: 600, textAlign: 'center' }}>Reps</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#5A6175', fontWeight: 600, textAlign: 'center' }}>Weight (kg)</span>
+                                    <span />
+                                    {exerciseSets.map((set) => (
+                                        <>
+                                            <span key={`n-${exerciseId}-${set.set_number}`} style={{ fontSize: '0.85rem', color: '#8A91A8', fontWeight: 600, textAlign: 'left' }}>{set.set_number}</span>
+                                            <input
+                                                key={`r-${exerciseId}-${set.set_number}`}
+                                                type="number"
+                                                style={{ background: '#1E2430', border: '1px solid #252B36', borderRadius: 10, padding: '8px 4px', color: '#fff', fontSize: '0.85rem', textAlign: 'center', outline: 'none' }}
+                                                value={set.reps} min={0}
+                                                onChange={(e) => updateSet(exerciseId, set.set_number, 'reps', Number(e.target.value))}
+                                            />
+                                            <input
+                                                key={`w-${exerciseId}-${set.set_number}`}
+                                                type="number"
+                                                style={{ background: '#1E2430', border: '1px solid #252B36', borderRadius: 10, padding: '8px 4px', color: '#FF6B35', fontSize: '0.85rem', textAlign: 'center', outline: 'none', fontWeight: 600 }}
+                                                value={set.weight} min={0} step={2.5}
+                                                onChange={(e) => updateSet(exerciseId, set.set_number, 'weight', Number(e.target.value))}
+                                            />
+                                            <button
+                                                key={`d-${exerciseId}-${set.set_number}`}
+                                                onClick={() => removeSet(exerciseId, set.set_number)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A6175', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
+            )}
+
+            {error && (
+                <div style={{ margin: '14px 0', padding: '12px 16px', background: 'rgba(255,69,69,0.1)', border: '1px solid rgba(255,69,69,0.25)', borderRadius: 14, fontSize: '0.85rem', color: '#FF4545' }}>
+                    {error}
+                </div>
+            )}
+
+            <div style={{ marginTop: 16 }}>
+                {saved ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, background: 'rgba(200,255,0,0.08)', border: '1px solid rgba(200,255,0,0.2)', borderRadius: 16, color: '#C8FF00', fontWeight: 600 }}>
+                        <CheckCircle size={20} /> Workout saved! Redirecting...
+                    </div>
+                ) : (
+                    <button onClick={handleSave} disabled={saving} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '0.95rem' }}>
+                        {saving ? 'Saving...' : 'Finish & Save Workout'}
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -330,7 +233,7 @@ function LogWorkoutForm() {
 
 export default function LogWorkoutPage() {
     return (
-        <Suspense fallback={<div className="text-gray-400 p-8">Loading...</div>}>
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#8A91A8' }}>Loading...</div>}>
             <LogWorkoutForm />
         </Suspense>
     );

@@ -1,130 +1,93 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Calendar, Clock, Dumbbell } from 'lucide-react';
-import PageHeader from '@/components/ui/PageHeader';
+import { ChevronDown, ChevronUp, Calendar, Dumbbell } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 
 const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
-interface ExerciseData {
-    name: string;
-}
+interface ExerciseData { name: string; }
+interface SetData { id: string; set_number: number; reps: number; weight: number; exercise_id: string; exercise: ExerciseData; }
+interface WorkoutLog { id: string; name: string; notes: string | null; started_at: string; finished_at: string | null; workout_sets: SetData[]; }
 
-interface SetData {
-    id: string;
-    set_number: number;
-    reps: number;
-    weight: number;
-    exercise_id: string;
-    exercise: ExerciseData;
-}
-
-interface WorkoutLog {
-    id: string;
-    name: string;
-    notes: string | null;
-    started_at: string;
-    finished_at: string | null;
-    workout_sets: SetData[];
-}
-
-function ExpandableWorkoutCard({ log }: { log: WorkoutLog }) {
+function WorkoutCard({ log }: { log: WorkoutLog }) {
     const [expanded, setExpanded] = useState(false);
 
-    const dateStr = new Date(log.started_at).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    });
-
-    const timeStr = new Date(log.started_at).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit'
-    });
-
-    // Group sets by exercise
-    const exerciseGroups: Record<string, { exerciseName: string, sets: SetData[] }> = {};
+    const dateStr = new Date(log.started_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const totalVolume = log.workout_sets?.reduce((sum, s) => sum + (s.weight || 0) * (s.reps || 0), 0) || 0;
+    const exerciseGroups: Record<string, { exerciseName: string; sets: SetData[] }> = {};
     log.workout_sets?.forEach(set => {
         if (!exerciseGroups[set.exercise_id]) {
-            exerciseGroups[set.exercise_id] = {
-                exerciseName: set.exercise?.name || 'Unknown Exercise',
-                sets: []
-            };
+            exerciseGroups[set.exercise_id] = { exerciseName: set.exercise?.name || 'Unknown', sets: [] };
         }
         exerciseGroups[set.exercise_id].sets.push(set);
     });
-
-    // Sort sets by set_number
-    Object.values(exerciseGroups).forEach(group => {
-        group.sets.sort((a, b) => a.set_number - b.set_number);
-    });
-
-    const totalVolume = log.workout_sets?.reduce((sum, set) => sum + (set.weight || 0) * (set.reps || 0), 0) || 0;
+    Object.values(exerciseGroups).forEach(g => g.sets.sort((a, b) => a.set_number - b.set_number));
 
     return (
-        <div className="card w-full mb-4 overflow-hidden">
+        <div className="card" style={{ borderRadius: 20, overflow: 'hidden', marginBottom: 12 }}>
             <div
-                className="p-5 flex items-start sm:items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
                 onClick={() => setExpanded(!expanded)}
+                style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
             >
-                <div className="flex-1 min-w-0 pr-4">
-                    <h3 className="text-lg font-bold text-gray-100 mb-1">{log.name}</h3>
-                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500">
-                        <div className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4" />
-                            {dateStr}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                    <div style={{
+                        width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                        background: 'rgba(255,107,53,0.12)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <Dumbbell size={20} color="#FF6B35" />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                        <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {log.name}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                            <Calendar size={12} color="#8A91A8" />
+                            <span style={{ fontSize: '0.75rem', color: '#8A91A8' }}>{dateStr}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4" />
-                            {timeStr}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-violet-400">
-                            <Dumbbell className="w-4 h-4" />
-                            {totalVolume.toLocaleString()} kg volume
-                        </div>
+                        {totalVolume > 0 && (
+                            <span style={{
+                                fontSize: '0.7rem', fontWeight: 600, color: '#FF6B35',
+                                background: 'rgba(255,107,53,0.12)', padding: '2px 8px', borderRadius: 99, display: 'inline-block', marginTop: 4
+                            }}>
+                                {totalVolume.toLocaleString()} kg volume
+                            </span>
+                        )}
                     </div>
                 </div>
-                <div className="p-2 text-gray-500">
-                    {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                <div style={{ flexShrink: 0, marginLeft: 8, color: '#5A6175' }}>
+                    {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                 </div>
             </div>
 
             {expanded && (
-                <div className="p-5 border-t border-gray-800 bg-gray-900/30">
+                <div style={{ padding: '0 16px 16px', borderTop: '1px solid #252B36' }}>
                     {log.notes && (
-                        <p className="text-sm text-gray-400 mb-6 italic">&quot;{log.notes}&quot;</p>
+                        <p style={{ fontSize: '0.8rem', color: '#8A91A8', fontStyle: 'italic', padding: '12px 0 8px' }}>
+                            &ldquo;{log.notes}&rdquo;
+                        </p>
                     )}
-
                     {Object.values(exerciseGroups).length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-4">No exercises logged.</p>
+                        <p style={{ fontSize: '0.8rem', color: '#5A6175', textAlign: 'center', padding: '16px 0' }}>No exercises logged.</p>
                     ) : (
-                        <div className="space-y-6">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 12 }}>
                             {Object.values(exerciseGroups).map((group, idx) => (
                                 <div key={idx}>
-                                    <h4 className="font-semibold text-gray-200 mb-3">{group.exerciseName}</h4>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b border-gray-800">
-                                                    <th className="text-center text-gray-500 font-medium pb-2 w-16">Set</th>
-                                                    <th className="text-center text-gray-500 font-medium pb-2">Reps</th>
-                                                    <th className="text-center text-gray-500 font-medium pb-2">Weight (kg)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-800/50">
-                                                {group.sets.map((set) => (
-                                                    <tr key={set.id} className="hover:bg-gray-800/20">
-                                                        <td className="py-2.5 text-center text-gray-400 font-medium">{set.set_number}</td>
-                                                        <td className="py-2.5 text-center text-gray-300">{set.reps || '-'}</td>
-                                                        <td className="py-2.5 text-center text-violet-300 font-medium">{set.weight || '-'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                    <p style={{ fontWeight: 600, fontSize: '0.85rem', color: '#fff', margin: '0 0 8px' }}>{group.exerciseName}</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr', gap: '6px 0', fontSize: '0.8rem' }}>
+                                        <span style={{ color: '#5A6175', fontWeight: 600 }}>Set</span>
+                                        <span style={{ color: '#5A6175', textAlign: 'center', fontWeight: 600 }}>Reps</span>
+                                        <span style={{ color: '#5A6175', textAlign: 'center', fontWeight: 600 }}>Weight</span>
+                                        {group.sets.map(set => (
+                                            <>
+                                                <span key={`s-${set.id}`} style={{ color: '#8A91A8', padding: '3px 0' }}>{set.set_number}</span>
+                                                <span key={`r-${set.id}`} style={{ color: '#fff', textAlign: 'center', padding: '3px 0', fontWeight: 600 }}>{set.reps || '—'}</span>
+                                                <span key={`w-${set.id}`} style={{ color: '#FF6B35', textAlign: 'center', padding: '3px 0', fontWeight: 600 }}>{set.weight ? `${set.weight}kg` : '—'}</span>
+                                            </>
+                                        ))}
                                     </div>
                                 </div>
                             ))}
@@ -142,28 +105,23 @@ export default function HistoryPage() {
 
     useEffect(() => {
         async function fetchHistory() {
-            setLoading(true);
             const { data, error } = await supabase
                 .from('workout_logs')
                 .select('*, workout_sets(*, exercise:exercises(name))')
                 .eq('user_id', DEMO_USER_ID)
                 .order('started_at', { ascending: false });
-
-            if (data && !error) {
-                setLogs(data);
-            }
+            if (data && !error) setLogs(data);
             setLoading(false);
         }
-
         fetchHistory();
     }, []);
 
     return (
-        <div>
-            <PageHeader
-                title="Workout History"
-                subtitle="Review your past training sessions"
-            />
+        <div style={{ padding: '0 16px 100px' }}>
+            <div style={{ paddingTop: 24, paddingBottom: 16 }}>
+                <p style={{ fontSize: '0.85rem', color: '#8A91A8', margin: 0 }}>All Sessions</p>
+                <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#fff', margin: 0 }}>History</h1>
+            </div>
 
             {loading ? (
                 <LoadingSpinner />
@@ -171,13 +129,11 @@ export default function HistoryPage() {
                 <EmptyState
                     title="No workouts yet"
                     description="Your workout history will appear here once you log your first session."
-                    icon={<Calendar className="w-12 h-12" />}
+                    icon={<Calendar size={28} />}
                 />
             ) : (
-                <div className="max-w-4xl mx-auto">
-                    {logs.map(log => (
-                        <ExpandableWorkoutCard key={log.id} log={log} />
-                    ))}
+                <div>
+                    {logs.map(log => <WorkoutCard key={log.id} log={log} />)}
                 </div>
             )}
         </div>

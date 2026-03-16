@@ -5,14 +5,14 @@ interface StatCardProps {
     value: string | number;
     subtitle?: string;
     icon: LucideIcon;
-    color?: 'violet' | 'pink' | 'emerald' | 'amber';
+    color?: 'orange' | 'lime' | 'blue' | 'pink';
 }
 
 const colorMap = {
-    violet: 'text-violet-400 bg-violet-600/10 border-violet-500/20',
-    pink: 'text-pink-400 bg-pink-600/10 border-pink-500/20',
-    emerald: 'text-emerald-400 bg-emerald-600/10 border-emerald-500/20',
-    amber: 'text-amber-400 bg-amber-600/10 border-amber-500/20',
+    orange: { bg: 'rgba(255,107,53,0.15)', icon: '#FF6B35' },
+    lime: { bg: 'rgba(200,255,0,0.12)', icon: '#C8FF00' },
+    blue: { bg: 'rgba(96,165,250,0.15)', icon: '#60A5FA' },
+    pink: { bg: 'rgba(244,114,182,0.15)', icon: '#F472B6' },
 };
 
 export default function StatCard({
@@ -20,19 +20,29 @@ export default function StatCard({
     value,
     subtitle,
     icon: Icon,
-    color = 'violet',
+    color = 'orange',
 }: StatCardProps) {
-    const colors = colorMap[color];
+    const { bg, icon: iconColor } = colorMap[color];
     return (
-        <div className="card p-6">
-            <div className="flex items-center justify-between mb-4">
-                <p className="text-sm text-gray-400">{title}</p>
-                <div className={`p-2 rounded-lg border ${colors}`}>
-                    <Icon className={`w-5 h-5 ${colors.split(' ')[0]}`} />
-                </div>
+        <div className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div
+                style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    background: bg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                <Icon size={18} color={iconColor} strokeWidth={2} />
             </div>
-            <p className="text-3xl font-bold text-gray-100">{value}</p>
-            {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+            <p style={{ fontSize: '1.6rem', fontWeight: 700, color: '#fff', lineHeight: 1, margin: '4px 0 0' }}>
+                {value}
+            </p>
+            <p style={{ fontSize: '0.8rem', fontWeight: 500, color: '#8A91A8', margin: 0 }}>{title}</p>
+            {subtitle && <p style={{ fontSize: '0.7rem', color: '#5A6175', margin: 0 }}>{subtitle}</p>}
         </div>
     );
 }

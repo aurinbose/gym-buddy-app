@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Gym Buddy - Fitness Tracker",
   description: "Track your workouts, build routines, and monitor your progress",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
 export default function RootLayout({
@@ -16,14 +17,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-gray-950 text-gray-100 min-h-screen`}>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 ml-64 p-8">
+    <html lang="en">
+      <body className={inter.className} style={{ background: '#0D1117', margin: 0, padding: 0 }}>
+        <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', position: 'relative' }}>
+          <main style={{ paddingBottom: 90 }}>
             {children}
           </main>
         </div>
+        <BottomNav />
       </body>
     </html>
   );
