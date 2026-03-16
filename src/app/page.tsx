@@ -91,7 +91,7 @@ export default function DashboardPage() {
             color: '#FF6B35', textTransform: 'uppercase',
             background: 'rgba(255,107,53,0.15)', padding: '4px 10px', borderRadius: 99
           }}>
-            Today's Goal
+            Todays Goal
           </span>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', margin: '10px 0 6px', lineHeight: 1.2 }}>
             Stay Active & <br />Hit Your Targets
