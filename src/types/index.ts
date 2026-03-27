@@ -5,14 +5,33 @@ export interface Routine {
     user_id: string;
     name: string;
     description?: string;
+    schedule?: RoutineDay[];
     created_at: string;
     updated_at: string;
+}
+
+export interface RoutineDay {
+    day: string;      // "Mon", "Tue", etc.
+    label: string;    // "Day 1", "Day 2", etc.
+    name: string;     // "Push", "Pull", "Legs", "Rest"
+    color: string;    // hex color for UI accent
+    exercises?: RoutineDayExercise[];
+}
+
+export interface RoutineDayExercise {
+    exercise_id: string;
+    exercise_name: string;
+    target_sets: number;
+    target_reps: number;
+    target_weight: number;
 }
 
 export interface Exercise {
     id: string;
     name: string;
     muscle_group?: string;
+    equipment?: string;
+    category?: string;
     created_at: string;
 }
 

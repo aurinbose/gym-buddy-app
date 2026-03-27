@@ -14,6 +14,7 @@ function LogWorkoutForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const routineParam = searchParams.get('routine');
+    const editId = searchParams.get('edit');
 
     const [workoutName, setWorkoutName] = useState('');
     const [notes, setNotes] = useState('');
@@ -34,12 +35,32 @@ function LogWorkoutForm() {
             ]);
             if (routinesRes.data) setRoutines(routinesRes.data);
             if (exercisesRes.data) setAllExercises(exercisesRes.data);
+
+            if (editId) {
+                const { data: logData } = await supabase.from('workout_logs').select('*').eq('id', editId).single();
+                if (logData) {
+                    setWorkoutName(logData.name);
+                    setNotes(logData.notes || '');
+                    if (logData.routine_id) setSelectedRoutine(logData.routine_id);
+                    
+                    const { data: setsData } = await supabase.from('workout_sets').select('*, exercise:exercises(name)').eq('workout_log_id', editId).order('set_number');
+                    if (setsData) {
+                        setSets(setsData.map(s => ({
+                            exercise_id: s.exercise_id,
+                            exercise_name: s.exercise?.name || 'Unknown',
+                            set_number: s.set_number,
+                            reps: s.reps || 0,
+                            weight: s.weight || 0
+                        })));
+                    }
+                }
+            }
         }
         init();
-    }, []);
+    }, [editId]);
 
     useEffect(() => {
-        if (!selectedRoutine) { setRoutineExercises([]); setSets([]); return; }
+        if (!selectedRoutine || editId) { setRoutineExercises([]); return; }
         async function loadRoutineExercises() {
             const { data } = await supabase.from('routine_exercises').select('*, exercise:exercises(*)').eq('routine_id', selectedRoutine).order('order_index');
             if (data) {
@@ -56,7 +77,7 @@ function LogWorkoutForm() {
             }
         }
         loadRoutineExercises();
-    }, [selectedRoutine, routines]);
+    }, [selectedRoutine, routines, editId]);
 
     function addSet(exerciseId: string, exerciseName: string) {
         const exerciseSets = sets.filter((s) => s.exercise_id === exerciseId);
@@ -82,17 +103,29 @@ function LogWorkoutForm() {
         if (!workoutName.trim()) { setError('Please enter a workout name.'); return; }
         setSaving(true); setError('');
 
-        const { data: log, error: logErr } = await supabase.from('workout_logs').insert({
-            user_id: DEMO_USER_ID, routine_id: selectedRoutine || null,
-            name: workoutName.trim(), notes: notes.trim() || null,
-            started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
-        }).select().single();
+        let logId = editId;
 
-        if (logErr || !log) { setError('Failed to save workout.'); setSaving(false); return; }
+        if (editId) {
+            const { error: logErr } = await supabase.from('workout_logs').update({
+                name: workoutName.trim(), notes: notes.trim() || null,
+                routine_id: selectedRoutine || null
+            }).eq('id', editId);
+            if (logErr) { setError('Failed to update workout.'); setSaving(false); return; }
+            
+            await supabase.from('workout_sets').delete().eq('workout_log_id', editId);
+        } else {
+            const { data: log, error: logErr } = await supabase.from('workout_logs').insert({
+                user_id: DEMO_USER_ID, routine_id: selectedRoutine || null,
+                name: workoutName.trim(), notes: notes.trim() || null,
+                started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
+            }).select().single();
+            if (logErr || !log) { setError('Failed to save workout.'); setSaving(false); return; }
+            logId = log.id;
+        }
 
-        if (sets.length > 0) {
+        if (sets.length > 0 && logId) {
             await supabase.from('workout_sets').insert(sets.map((s) => ({
-                workout_log_id: log.id, exercise_id: s.exercise_id,
+                workout_log_id: logId, exercise_id: s.exercise_id,
                 set_number: s.set_number, reps: s.reps, weight: s.weight || null,
             })));
         }
@@ -111,8 +144,12 @@ function LogWorkoutForm() {
                     <ArrowLeft size={18} />
                 </button>
                 <div>
-                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', margin: 0 }}>Log Workout</h1>
-                    <p style={{ fontSize: '0.8rem', color: '#8A91A8', margin: 0 }}>Record your session</p>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', margin: 0 }}>
+                        {editId ? 'Edit Workout' : 'Log Workout'}
+                    </h1>
+                    <p style={{ fontSize: '0.8rem', color: '#8A91A8', margin: 0 }}>
+                        {editId ? 'Update your session' : 'Record your session'}
+                    </p>
                 </div>
             </div>
 
@@ -126,7 +163,7 @@ function LogWorkoutForm() {
                     </div>
                     <div>
                         <label className="label">Load Routine (optional)</label>
-                        <select style={{ ...inputStyle, appearance: 'none' }} value={selectedRoutine} onChange={(e) => setSelectedRoutine(e.target.value)}>
+                        <select disabled={!!editId} style={{ ...inputStyle, appearance: 'none', opacity: editId ? 0.6 : 1 }} value={selectedRoutine} onChange={(e) => setSelectedRoutine(e.target.value)}>
                             <option value="">— Select routine —</option>
                             {routines.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>

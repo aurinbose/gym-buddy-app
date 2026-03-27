@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Calendar, Dumbbell } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronDown, ChevronUp, Calendar, Dumbbell, Edit2, Trash2 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
@@ -12,7 +13,7 @@ interface ExerciseData { name: string; }
 interface SetData { id: string; set_number: number; reps: number; weight: number; exercise_id: string; exercise: ExerciseData; }
 interface WorkoutLog { id: string; name: string; notes: string | null; started_at: string; finished_at: string | null; workout_sets: SetData[]; }
 
-function WorkoutCard({ log }: { log: WorkoutLog }) {
+function WorkoutCard({ log, onDelete, deleting }: { log: WorkoutLog; onDelete: (id: string) => void; deleting: string | null }) {
     const [expanded, setExpanded] = useState(false);
 
     const dateStr = new Date(log.started_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -58,8 +59,24 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
                         )}
                     </div>
                 </div>
-                <div style={{ flexShrink: 0, marginLeft: 8, color: '#5A6175' }}>
-                    {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                <div style={{ flexShrink: 0, marginLeft: 8, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Link
+                        href={`/log-workout?edit=${log.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: '#5A6175', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+                    >
+                        <Edit2 size={16} />
+                    </Link>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(log.id); }}
+                        disabled={deleting === log.id}
+                        style={{ color: '#5A6175', border: 'none', background: 'none', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                    <div style={{ color: '#5A6175', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
                 </div>
             </div>
 
@@ -102,6 +119,16 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
 export default function HistoryPage() {
     const [logs, setLogs] = useState<WorkoutLog[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deleting, setDeleting] = useState<string | null>(null);
+
+    async function handleDeleteLog(id: string) {
+        setDeleting(id);
+        const { error } = await supabase.from('workout_logs').delete().eq('id', id);
+        if (!error) {
+            setLogs(prev => prev.filter(log => log.id !== id));
+        }
+        setDeleting(null);
+    }
 
     useEffect(() => {
         async function fetchHistory() {
@@ -132,8 +159,8 @@ export default function HistoryPage() {
                     icon={<Calendar size={28} />}
                 />
             ) : (
-                <div>
-                    {logs.map(log => <WorkoutCard key={log.id} log={log} />)}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {logs.map(log => <WorkoutCard key={log.id} log={log} onDelete={handleDeleteLog} deleting={deleting} />)}
                 </div>
             )}
         </div>
