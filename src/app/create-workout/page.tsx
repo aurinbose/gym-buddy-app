@@ -54,7 +54,7 @@ function SortableExerciseItem({
     ex, updateExercise, removeExercise
 }: {
     ex: RoutineDayExercise;
-    updateExercise: (id: string, field: keyof RoutineDayExercise, value: number) => void;
+    updateExercise: (id: string, field: keyof RoutineDayExercise, value: string | number) => void;
     removeExercise: (id: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: ex.exercise_id });
@@ -82,10 +82,14 @@ function SortableExerciseItem({
                     <div key={field}>
                         <p style={{ fontSize: '0.6rem', color: '#8A91A8', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>{label}</p>
                         <input
-                            type="number"
+                            type={field === 'target_reps' ? 'text' : 'number'}
                             style={{ background: '#0D1117', border: '1px solid #252B36', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box', textAlign: 'center' }}
-                            value={value} min={0} step={step || 1}
-                            onChange={(e) => updateExercise(ex.exercise_id, field, Number(e.target.value))}
+                            value={value}
+                            {...(field !== 'target_reps' ? { min: 0, step: step || 1 } : {})}
+                            onChange={(e) => {
+                                const val = field === 'target_reps' ? e.target.value : Number(e.target.value);
+                                updateExercise(ex.exercise_id, field, val);
+                            }}
                         />
                     </div>
                 ))}
@@ -360,7 +364,7 @@ function CreateWorkoutForm() {
                     } else {
                         setMode('simple');
                         if (exercisesData) {
-                            setSimpleExercises(exercisesData.map((e: { exercise_id: string; exercise?: { name: string }; target_sets?: number; target_reps?: number; target_weight?: number }) => ({
+                            setSimpleExercises(exercisesData.map((e: { exercise_id: string; exercise?: { name: string }; target_sets?: number; target_reps?: string | number; target_weight?: number }) => ({
                                 exercise_id: e.exercise_id,
                                 exercise_name: e.exercise?.name || 'Unknown',
                                 target_sets: e.target_sets || 3,
@@ -379,10 +383,10 @@ function CreateWorkoutForm() {
     // ── Simple mode helpers ──────────────────────────────────────────────────
     function addSimpleExercise(ex: Exercise) {
         if (simpleExercises.some(e => e.exercise_id === ex.id)) return;
-        setSimpleExercises(prev => [...prev, { exercise_id: ex.id, exercise_name: ex.name, target_sets: 3, target_reps: 10, target_weight: 0 }]);
+        setSimpleExercises(prev => [...prev, { exercise_id: ex.id, exercise_name: ex.name, target_sets: 3, target_reps: '10', target_weight: 0 }]);
     }
     function removeSimpleExercise(id: string) { setSimpleExercises(prev => prev.filter(e => e.exercise_id !== id)); }
-    function updateSimpleExercise(id: string, field: keyof RoutineDayExercise, value: number) {
+    function updateSimpleExercise(id: string, field: keyof RoutineDayExercise, value: string | number) {
         setSimpleExercises(prev => prev.map(e => e.exercise_id === id ? { ...e, [field]: value } : e));
     }
 
@@ -398,13 +402,13 @@ function CreateWorkoutForm() {
             ...d,
             exercises: d.exercises.some(e => e.exercise_id === ex.id)
                 ? d.exercises
-                : [...d.exercises, { exercise_id: ex.id, exercise_name: ex.name, target_sets: 3, target_reps: 10, target_weight: 0 }]
+                : [...d.exercises, { exercise_id: ex.id, exercise_name: ex.name, target_sets: 3, target_reps: '10', target_weight: 0 }]
         }));
     }
     function removeDayExercise(dayIndex: number, exId: string) {
         setDays(prev => prev.map((d, i) => i !== dayIndex ? d : { ...d, exercises: d.exercises.filter(e => e.exercise_id !== exId) }));
     }
-    function updateDayExercise(dayIndex: number, exId: string, field: keyof RoutineDayExercise, value: number) {
+    function updateDayExercise(dayIndex: number, exId: string, field: keyof RoutineDayExercise, value: string | number) {
         setDays(prev => prev.map((d, i) => i !== dayIndex ? d : {
             ...d, exercises: d.exercises.map(e => e.exercise_id === exId ? { ...e, [field]: value } : e)
         }));
@@ -480,7 +484,7 @@ function CreateWorkoutForm() {
         }
 
         // Insert routine_exercises
-        const allExercises: { exercise_id: string; order_index: number; target_sets: number; target_reps: number; target_weight: number | null }[] = [];
+        const allExercises: { exercise_id: string; order_index: number; target_sets: number; target_reps: string | number; target_weight: number | null }[] = [];
 
         if (mode === 'simple') {
             simpleExercises.forEach((e, idx) => allExercises.push({

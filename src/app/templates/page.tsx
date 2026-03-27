@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
-interface TemplateExercise { name: string; target_sets: number; target_reps: number; }
+interface TemplateExercise { name: string; target_sets: number; target_reps: string | number; }
 interface WorkoutTemplate { id: string; name: string; description: string; tag: string; exercises: TemplateExercise[]; }
 
 const templates: WorkoutTemplate[] = [
@@ -80,7 +80,7 @@ export default function TemplatesPage() {
                 .map((ex, index) => {
                     const exerciseId = exerciseMap.get(ex.name.toLowerCase());
                     if (!exerciseId) return null;
-                    return { routine_id: routine.id, exercise_id: exerciseId, order_index: index, target_sets: ex.target_sets, target_reps: ex.target_reps, target_weight: null };
+                    return { routine_id: routine.id, exercise_id: exerciseId, order_index: index, target_sets: ex.target_sets, target_reps: String(ex.target_reps), target_weight: null };
                 })
                 .filter(Boolean);
 

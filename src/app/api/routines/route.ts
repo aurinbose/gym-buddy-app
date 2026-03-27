@@ -33,12 +33,12 @@ export async function POST(request: NextRequest) {
     if (routineErr) return NextResponse.json({ error: routineErr.message }, { status: 500 });
 
     if (exercises.length > 0) {
-        const routineExercises = exercises.map((ex: { exercise_id: string; target_sets?: number; target_reps?: number; target_weight?: number }, i: number) => ({
+        const routineExercises = exercises.map((ex: { exercise_id: string; target_sets?: number; target_reps?: string | number; target_weight?: number }, i: number) => ({
             routine_id: routine.id,
             exercise_id: ex.exercise_id,
             order_index: i,
             target_sets: ex.target_sets ?? 3,
-            target_reps: ex.target_reps ?? 10,
+            target_reps: String(ex.target_reps ?? '10'),
             target_weight: ex.target_weight ?? null,
         }));
         await supabase.from('routine_exercises').insert(routineExercises);

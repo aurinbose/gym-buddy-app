@@ -22,7 +22,7 @@ export interface RoutineDayExercise {
     exercise_id: string;
     exercise_name: string;
     target_sets: number;
-    target_reps: number;
+    target_reps: string | number;
     target_weight: number;
 }
 
@@ -41,7 +41,7 @@ export interface RoutineExercise {
     exercise_id: string;
     order_index: number;
     target_sets?: number;
-    target_reps?: number;
+    target_reps?: string | number;
     target_weight?: number;
     exercise?: Exercise;
 }
@@ -87,7 +87,7 @@ export interface CreateRoutineForm {
     exercises: {
         exercise_id: string;
         target_sets?: number;
-        target_reps?: number;
+        target_reps?: string | number;
         target_weight?: number;
     }[];
 }

@@ -10,6 +10,16 @@ const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 interface SetEntry { exercise_id: string; exercise_name: string; set_number: number; reps: number; weight: number; }
 
+function parseReps(targetReps: string | number | undefined | null, setIndex: number): number {
+    if (!targetReps) return 10;
+    if (typeof targetReps === 'number') return targetReps;
+    
+    const parts = String(targetReps).split(',').map(p => p.trim());
+    const part = parts[setIndex] || parts[0];
+    const match = part.match(/\d+/);
+    return match ? parseInt(match[0]) : 10;
+}
+
 function LogWorkoutForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -70,7 +80,7 @@ function LogWorkoutForm() {
                 const initialSets: SetEntry[] = data.flatMap((re) =>
                     Array.from({ length: re.target_sets || 3 }, (_, i) => ({
                         exercise_id: re.exercise_id, exercise_name: re.exercise?.name || '',
-                        set_number: i + 1, reps: re.target_reps || 10, weight: re.target_weight || 0,
+                        set_number: i + 1, reps: parseReps(re.target_reps, i), weight: re.target_weight || 0,
                     }))
                 );
                 setSets(initialSets);
