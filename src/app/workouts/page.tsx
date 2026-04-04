@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Plus, Dumbbell, Trash2, Play, ChevronDown, ChevronUp, Calendar, Edit2, Download } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
@@ -23,11 +23,7 @@ export default function WorkoutsPage() {
         if (!authLoading && !user) router.push('/login');
     }, [user, authLoading, router]);
 
-    useEffect(() => { 
-        if (user) fetchRoutines(); 
-    }, [user]);
-
-    async function fetchRoutines() {
+    const fetchRoutines = useCallback(async () => {
         if (!user) return;
         const { data } = await supabase
             .from('routines')
@@ -36,7 +32,11 @@ export default function WorkoutsPage() {
             .order('created_at', { ascending: false });
         if (data) setRoutines(data as Routine[]);
         setLoading(false);
-    }
+    }, [user]);
+
+    useEffect(() => { 
+        if (user) fetchRoutines(); 
+    }, [user, fetchRoutines]);
 
     async function deleteRoutine(id: string) {
         setDeleting(id);

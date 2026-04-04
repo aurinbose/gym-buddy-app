@@ -73,7 +73,7 @@ function LogWorkoutForm() {
             }
         }
         init();
-    }, [editId]);
+    }, [editId, user]);
 
     useEffect(() => {
         if (!selectedRoutine || editId) { setRoutineExercises([]); return; }

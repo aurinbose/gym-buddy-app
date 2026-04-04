@@ -149,7 +149,7 @@ export default function HistoryPage() {
             setLoading(false);
         }
         fetchHistory();
-    }, []);
+    }, [user]);
 
     return (
         <div style={{ padding: '0 16px 100px' }}>
