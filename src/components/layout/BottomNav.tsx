@@ -15,6 +15,11 @@ const navItems = [
 export default function BottomNav() {
     const pathname = usePathname();
 
+    // Hide nav on auth pages
+    if (pathname === '/login' || pathname === '/signup') {
+        return null;
+    }
+
     return (
         <nav className="fixed bottom-0 inset-x-0 z-50 flex justify-center">
             <div

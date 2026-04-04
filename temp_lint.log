@@ -1,0 +1,18 @@
+fix2.js
+  1:12 A `require()` style import is forbidden.
+fix_hooks.js
+  1:12 A `require()` style import is forbidden.
+  2:14 A `require()` style import is forbidden.
+replace_demo.js
+  1:12 A `require()` style import is forbidden.
+  2:14 A `require()` style import is forbidden.
+  11:7 'filesToUpdateApi' is assigned a value but never used.
+page.tsx
+  33:23 Unexpected any. Specify a different type.
+  116:24 `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.
+page.tsx
+  7:10 'LayoutDashboard' is defined but never used.
+  7:82 'Activity' is defined but never used.
+  70:23 Unexpected any. Specify a different type.
+pdfGenerator.ts
+  45:34 Unexpected any. Specify a different type.

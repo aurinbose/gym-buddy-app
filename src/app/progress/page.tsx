@@ -7,8 +7,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 import { Exercise } from '@/types';
-
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface ProgressEntry { workout_date: string; max_weight: number; total_volume: number; total_reps: number; sets_count: number; }
 interface ExerciseProgress { exercise: Exercise; entries: ProgressEntry[]; bestWeight: number; totalVolume: number; }
@@ -19,10 +19,17 @@ export default function ProgressPage() {
     const [progress, setProgress] = useState<ExerciseProgress | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadingProgress, setLoadingProgress] = useState(false);
+    const { user, loading: authLoading, profile } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!authLoading && !user) router.push('/login');
+    }, [user, authLoading, router]);
 
     useEffect(() => {
         async function fetchExercises() {
-            const { data: logsData } = await supabase.from('workout_logs').select('id').eq('user_id', DEMO_USER_ID);
+            if (!user) return;
+            const { data: logsData } = await supabase.from('workout_logs').select('id').eq('user_id', user.id);
             const logIds = logsData?.map((l) => l.id) || [];
             if (logIds.length > 0) {
                 const { data: setsData } = await supabase.from('workout_sets').select('exercise_id').in('workout_log_id', logIds);
@@ -34,16 +41,16 @@ export default function ProgressPage() {
             }
             setLoading(false);
         }
-        fetchExercises();
-    }, []);
+        if (user) fetchExercises();
+    }, [user]);
 
     async function loadProgress(exerciseId: string) {
-        if (!exerciseId) return;
+        if (!exerciseId || !user) return;
         setLoadingProgress(true);
         const exercise = exercises.find((e) => e.id === exerciseId);
         if (!exercise) return;
 
-        const { data: logsData } = await supabase.from('workout_logs').select('id, started_at').eq('user_id', DEMO_USER_ID).order('started_at', { ascending: true });
+        const { data: logsData } = await supabase.from('workout_logs').select('id, started_at').eq('user_id', user.id).order('started_at', { ascending: true });
         const logIds = logsData?.map((l) => l.id) || [];
         if (logIds.length === 0) { setProgress({ exercise, entries: [], bestWeight: 0, totalVolume: 0 }); setLoadingProgress(false); return; }
 
@@ -134,7 +141,7 @@ export default function ProgressPage() {
                                                     itemStyle={{ color: '#FF6B35', fontWeight: 600 }}
                                                     labelStyle={{ color: '#fff', marginBottom: 4 }}
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                    formatter={(value: any) => [`${value} kg`, 'Max Weight']}
+                                                    formatter={(value: any) => [`${value} ${profile?.weight_unit || 'kg'}`, 'Max Weight']}
                                                 />
                                                 <Line type="monotone" dataKey="weight" stroke="#FF6B35" strokeWidth={2.5}
                                                     dot={{ fill: '#0D1117', stroke: '#FF6B35', strokeWidth: 2, r: 4 }}
@@ -165,8 +172,8 @@ export default function ProgressPage() {
                                                 <span style={{ fontSize: '0.8rem', color: '#8A91A8' }}>
                                                     {new Date(entry.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                 </span>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FF6B35', textAlign: 'right' }}>{entry.max_weight}kg</span>
-                                                <span style={{ fontSize: '0.8rem', color: '#8A91A8', textAlign: 'right' }}>{entry.total_volume.toLocaleString()}kg</span>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FF6B35', textAlign: 'right' }}>{entry.max_weight}{profile?.weight_unit || 'kg'}</span>
+                                                <span style={{ fontSize: '0.8rem', color: '#8A91A8', textAlign: 'right' }}>{entry.total_volume.toLocaleString()}{profile?.weight_unit || 'kg'}</span>
                                             </div>
                                         ))}
                                     </div>

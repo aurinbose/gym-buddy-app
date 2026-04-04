@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Copy, CheckCircle, Database } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 interface TemplateExercise { name: string; target_sets: number; target_reps: string | number; }
 interface WorkoutTemplate { id: string; name: string; description: string; tag: string; exercises: TemplateExercise[]; }
@@ -57,7 +57,13 @@ const tagColors: Record<string, { bg: string; text: string }> = {
 };
 
 export default function TemplatesPage() {
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
+    useEffect(() => {
+        if (!authLoading && !user) router.push('/login');
+    }, [user, authLoading, router]);
+
+
     const [importingId, setImportingId] = useState<string | null>(null);
     const [importedId, setImportedId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -71,7 +77,7 @@ export default function TemplatesPage() {
             const exerciseMap = new Map(dbExercises.map(ex => [ex.name.toLowerCase(), ex.id]));
 
             const { data: routine, error: routineErr } = await supabase.from('routines').insert({
-                user_id: DEMO_USER_ID, name: template.name, description: template.description
+                user_id: user?.id, name: template.name, description: template.description
             }).select().single();
 
             if (routineErr || !routine) throw new Error('Failed to create routine.');

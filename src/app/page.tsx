@@ -6,8 +6,8 @@ import { Dumbbell, TrendingUp, ClipboardList, Flame, ChevronRight, Bell } from '
 import StatCard from '@/components/ui/StatCard';
 import { supabase } from '@/lib/supabase';
 import { WorkoutLog, Routine } from '@/types';
-
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const [routines, setRoutines] = useState<Routine[]>([]);
@@ -15,12 +15,22 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [totalWorkouts, setTotalWorkouts] = useState(0);
 
+  const { user, profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+        router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
   useEffect(() => {
     async function fetchData() {
+      if (!user) return;
       try {
         const [routinesRes, workoutsRes] = await Promise.all([
-          supabase.from('routines').select('*').eq('user_id', DEMO_USER_ID).order('created_at', { ascending: false }).limit(3),
-          supabase.from('workout_logs').select('*, routine:routines(name)').eq('user_id', DEMO_USER_ID).order('started_at', { ascending: false }).limit(5),
+          supabase.from('routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3),
+          supabase.from('workout_logs').select('*, routine:routines(name)').eq('user_id', user.id).order('started_at', { ascending: false }).limit(5),
         ]);
         if (routinesRes.data) setRoutines(routinesRes.data);
         if (workoutsRes.data) {
@@ -33,8 +43,12 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
-    fetchData();
-  }, []);
+    if (user) {
+        fetchData();
+    }
+  }, [user]);
+
+  const targetWorkouts = profile?.weekly_target || 3;
 
   const thisWeekWorkouts = recentWorkouts.filter((w) => {
     const workoutDate = new Date(w.started_at);
@@ -49,7 +63,7 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 24, paddingBottom: 8 }}>
         <div>
           <p style={{ fontSize: '0.85rem', color: '#8A91A8', margin: 0 }}>Good day,</p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', margin: 0 }}>Athlete 💪</h1>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', margin: 0 }}>{profile?.full_name?.split(' ')[0] || 'Athlete'} 💪</h1>
         </div>
         <div style={{
           width: 42, height: 42, borderRadius: '50%',
@@ -97,7 +111,7 @@ export default function DashboardPage() {
             Stay Active & <br />Hit Your Targets
           </h2>
           <p style={{ fontSize: '0.8rem', color: '#8A91A8', margin: '0 0 16px' }}>
-            {thisWeekWorkouts} session{thisWeekWorkouts !== 1 ? 's' : ''} this week
+            {thisWeekWorkouts} / {targetWorkouts} sessions this week
           </p>
           <Link href="/log-workout" className="btn-primary" style={{ fontSize: '0.85rem', padding: '10px 20px' }}>
             Log Workout

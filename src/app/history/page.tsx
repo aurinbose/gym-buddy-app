@@ -6,8 +6,8 @@ import { ChevronDown, ChevronUp, Calendar, Dumbbell, Edit2, Trash2 } from 'lucid
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
-
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface ExerciseData { name: string; }
 interface SetData { id: string; set_number: number; reps: number; weight: number; exercise_id: string; exercise: ExerciseData; }
@@ -117,6 +117,13 @@ function WorkoutCard({ log, onDelete, deleting }: { log: WorkoutLog; onDelete: (
 }
 
 export default function HistoryPage() {
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
+    useEffect(() => {
+        if (!authLoading && !user) router.push('/login');
+    }, [user, authLoading, router]);
+
+
     const [logs, setLogs] = useState<WorkoutLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -132,10 +139,11 @@ export default function HistoryPage() {
 
     useEffect(() => {
         async function fetchHistory() {
+            if (!user) return;
             const { data, error } = await supabase
                 .from('workout_logs')
                 .select('*, workout_sets(*, exercise:exercises(name))')
-                .eq('user_id', DEMO_USER_ID)
+                .eq('user_id', user.id)
                 .order('started_at', { ascending: false });
             if (data && !error) setLogs(data);
             setLoading(false);

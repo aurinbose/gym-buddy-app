@@ -3,7 +3,38 @@
 @tailwind utilities;
 
 @layer base {
+  /* shadcn/ui required HSL tokens — dark theme by default */
   :root {
+    /* Background: #0D1117 */
+    --background: 215 29% 7%;
+    /* Surface: #161B22 */
+    --foreground: 0 0% 98%;
+    --card: 215 22% 11%;
+    --card-foreground: 0 0% 98%;
+    --popover: 215 22% 11%;
+    --popover-foreground: 0 0% 98%;
+    /* Primary = our orange #FF6B35 */
+    --primary: 18 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    /* Secondary = surface raised #1E2430 */
+    --secondary: 220 20% 15%;
+    --secondary-foreground: 0 0% 90%;
+    /* Muted = subtle text areas */
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 12% 55%;
+    /* Accent = lime #C8FF00 */
+    --accent: 75 100% 50%;
+    --accent-foreground: 0 0% 5%;
+    /* Destructive = danger red */
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 0 0% 100%;
+    /* Border: #252B36 */
+    --border: 220 18% 18%;
+    --input: 220 18% 18%;
+    --ring: 18 100% 60%;
+    --radius: 0.75rem;
+
+    /* Legacy brand tokens (kept for existing components) */
     --bg: #0D1117;
     --surface: #161B22;
     --surface-raised: #1E2430;
@@ -13,9 +44,9 @@
     --lime-muted: rgba(200, 255, 0, 0.12);
     --text-primary: #FFFFFF;
     --text-secondary: #8A91A8;
-    --border: #252B36;
     --danger: #FF4545;
   }
+
 
   * {
     -webkit-tap-highlight-color: transparent;

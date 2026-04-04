@@ -4,24 +4,29 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Trash2, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { Routine, RoutineExercise, Exercise } from '@/types';
 
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 interface SetEntry { exercise_id: string; exercise_name: string; set_number: number; reps: number; weight: number; }
 
-function parseReps(targetReps: string | number | undefined | null, setIndex: number): number {
-    if (!targetReps) return 10;
-    if (typeof targetReps === 'number') return targetReps;
+function parseTargetValue(targetValue: string | number | undefined | null, setIndex: number, defaultValue: number): number {
+    if (!targetValue) return defaultValue;
+    if (typeof targetValue === 'number') return targetValue;
     
-    const parts = String(targetReps).split(',').map(p => p.trim());
+    const parts = String(targetValue).split(',').map(p => p.trim());
     const part = parts[setIndex] || parts[0];
-    const match = part.match(/\d+/);
-    return match ? parseInt(match[0]) : 10;
+    const match = part.match(/[\d.]+/);
+    return match ? parseFloat(match[0]) : defaultValue;
 }
 
 function LogWorkoutForm() {
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
+    useEffect(() => {
+        if (!authLoading && !user) router.push('/login');
+    }, [user, authLoading, router]);
+
     const searchParams = useSearchParams();
     const routineParam = searchParams.get('routine');
     const editId = searchParams.get('edit');
@@ -39,8 +44,9 @@ function LogWorkoutForm() {
 
     useEffect(() => {
         async function init() {
+            if (!user) return;
             const [routinesRes, exercisesRes] = await Promise.all([
-                supabase.from('routines').select('*').eq('user_id', DEMO_USER_ID).order('name'),
+                supabase.from('routines').select('*').eq('user_id', user.id).order('name'),
                 supabase.from('exercises').select('*').order('name'),
             ]);
             if (routinesRes.data) setRoutines(routinesRes.data);
@@ -80,7 +86,9 @@ function LogWorkoutForm() {
                 const initialSets: SetEntry[] = data.flatMap((re) =>
                     Array.from({ length: re.target_sets || 3 }, (_, i) => ({
                         exercise_id: re.exercise_id, exercise_name: re.exercise?.name || '',
-                        set_number: i + 1, reps: parseReps(re.target_reps, i), weight: re.target_weight || 0,
+                        set_number: i + 1, 
+                        reps: parseTargetValue(re.target_reps, i, 10), 
+                        weight: parseTargetValue(re.target_weight, i, 0),
                     }))
                 );
                 setSets(initialSets);
@@ -125,7 +133,7 @@ function LogWorkoutForm() {
             await supabase.from('workout_sets').delete().eq('workout_log_id', editId);
         } else {
             const { data: log, error: logErr } = await supabase.from('workout_logs').insert({
-                user_id: DEMO_USER_ID, routine_id: selectedRoutine || null,
+                user_id: user?.id, routine_id: selectedRoutine || null,
                 name: workoutName.trim(), notes: notes.trim() || null,
                 started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
             }).select().single();
@@ -279,6 +287,7 @@ function LogWorkoutForm() {
 }
 
 export default function LogWorkoutPage() {
+
     return (
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: '#8A91A8' }}>Loading...</div>}>
             <LogWorkoutForm />

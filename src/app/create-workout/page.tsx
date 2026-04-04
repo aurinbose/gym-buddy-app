@@ -17,8 +17,7 @@ import {
     verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+import { useAuth } from '@/context/AuthContext';
 
 const MUSCLE_GROUPS = [
     'All', 'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps',
@@ -59,6 +58,21 @@ function SortableExerciseItem({
 }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: ex.exercise_id });
     const style = { transform: CSS.Transform.toString(transform), transition };
+    const [expanded, setExpanded] = useState(false);
+
+    const parseTargetArray = (val: string | number, len: number) => {
+        const parts = String(val).split(',').map(s => s.trim());
+        return Array.from({ length: len }, (_, i) => parts[i] !== undefined ? parts[i] : (parts[0] || '0'));
+    };
+
+    const updateSpecificSet = (field: 'target_reps' | 'target_weight', index: number, newVal: string) => {
+        const arr = parseTargetArray(ex[field], ex.target_sets);
+        arr[index] = newVal;
+        updateExercise(ex.exercise_id, field, arr.join(', '));
+    };
+
+    const repArray = parseTargetArray(ex.target_reps, ex.target_sets);
+    const weightArray = parseTargetArray(ex.target_weight, ex.target_sets);
 
     return (
         <div ref={setNodeRef} style={{ ...style, background: '#161B22', borderRadius: 14, padding: '12px 14px', border: '1px solid #252B36' }}>
@@ -67,33 +81,73 @@ function SortableExerciseItem({
                     <div {...attributes} {...listeners} style={{ cursor: 'grab', color: '#5A6175', touchAction: 'none', display: 'flex' }}>
                         <GripVertical size={15} />
                     </div>
-                    <span style={{ fontWeight: 600, fontSize: '0.82rem', color: '#fff' }}>{ex.exercise_name}</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.82rem', color: '#fff', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.exercise_name}</span>
                 </div>
-                <button onClick={() => removeExercise(ex.exercise_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A6175', padding: 4, display: 'flex' }}>
-                    <X size={14} />
-                </button>
+                <div style={{ display: 'flex', gap: 4 }}>
+                    {ex.target_sets > 1 && (
+                        <button onClick={() => setExpanded(!expanded)} style={{ background: 'rgba(255,107,53,0.1)', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#FF6B35', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', fontWeight: 600 }}>
+                            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {expanded ? 'Simple' : 'Per Set'}
+                        </button>
+                    )}
+                    <button onClick={() => removeExercise(ex.exercise_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A6175', padding: 4, display: 'flex' }}>
+                        <X size={14} />
+                    </button>
+                </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                {[
-                    { label: 'Sets', field: 'target_sets' as const, value: ex.target_sets },
-                    { label: 'Reps', field: 'target_reps' as const, value: ex.target_reps },
-                    { label: 'Weight kg', field: 'target_weight' as const, value: ex.target_weight, step: 2.5 },
-                ].map(({ label, field, value, step }) => (
-                    <div key={field}>
-                        <p style={{ fontSize: '0.6rem', color: '#8A91A8', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>{label}</p>
-                        <input
-                            type={field === 'target_reps' ? 'text' : 'number'}
-                            style={{ background: '#0D1117', border: '1px solid #252B36', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box', textAlign: 'center' }}
-                            value={value}
-                            {...(field !== 'target_reps' ? { min: 0, step: step || 1 } : {})}
-                            onChange={(e) => {
-                                const val = field === 'target_reps' ? e.target.value : Number(e.target.value);
-                                updateExercise(ex.exercise_id, field, val);
-                            }}
-                        />
+
+            {!expanded ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                    {[
+                        { label: 'Sets', field: 'target_sets' as const, value: ex.target_sets },
+                        { label: 'Reps', field: 'target_reps' as const, value: ex.target_reps },
+                        { label: 'Weight kg', field: 'target_weight' as const, value: ex.target_weight },
+                    ].map(({ label, field, value }) => (
+                        <div key={field}>
+                            <p style={{ fontSize: '0.6rem', color: '#8A91A8', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>{label}</p>
+                            <input
+                                type={field === 'target_sets' ? 'number' : 'text'}
+                                style={{ background: '#0D1117', border: '1px solid #252B36', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box', textAlign: 'center' }}
+                                value={value}
+                                {...(field === 'target_sets' ? { min: 0 } : {})}
+                                onChange={(e) => {
+                                    const val = field === 'target_sets' ? Number(e.target.value) : e.target.value;
+                                    updateExercise(ex.exercise_id, field, val);
+                                }}
+                            />
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                         <p style={{ width: 40, fontSize: '0.6rem', color: '#8A91A8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>Sets</p>
+                         <input type="number" min={0} value={ex.target_sets} onChange={(e) => updateExercise(ex.exercise_id, 'target_sets', Number(e.target.value))} style={{ background: '#0D1117', border: '1px solid #252B36', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: '0.82rem', width: 60, boxSizing: 'border-box', textAlign: 'center' }} />
                     </div>
-                ))}
-            </div>
+                    {Array.from({ length: ex.target_sets }).map((_, i) => (
+                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr', gap: 6, alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#8A91A8', fontWeight: 600 }}>Set {i+1}</span>
+                            <div style={{ position: 'relative' }}>
+                                <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: '0.6rem', color: '#5A6175' }}>reps</span>
+                                <input
+                                    type="text"
+                                    value={repArray[i] || ''}
+                                    style={{ background: '#0D1117', border: '1px solid #252B36', borderRadius: 8, padding: '6px 24px 6px 8px', color: '#fff', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }}
+                                    onChange={(e) => updateSpecificSet('target_reps', i, e.target.value)}
+                                />
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: '0.6rem', color: '#5A6175' }}>kg</span>
+                                <input
+                                    type="text"
+                                    value={weightArray[i] || ''}
+                                    style={{ background: '#0D1117', border: '1px solid #252B36', borderRadius: 8, padding: '6px 20px 6px 8px', color: '#fff', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }}
+                                    onChange={(e) => updateSpecificSet('target_weight', i, e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -284,7 +338,12 @@ function ExerciseLibrary({
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 function CreateWorkoutForm() {
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
+    useEffect(() => {
+        if (!authLoading && !user) router.push('/login');
+    }, [user, authLoading, router]);
+
     const searchParams = useSearchParams();
     const editId = searchParams.get('edit');
 
@@ -364,11 +423,11 @@ function CreateWorkoutForm() {
                     } else {
                         setMode('simple');
                         if (exercisesData) {
-                            setSimpleExercises(exercisesData.map((e: { exercise_id: string; exercise?: { name: string }; target_sets?: number; target_reps?: string | number; target_weight?: number }) => ({
+                            setSimpleExercises(exercisesData.map((e: { exercise_id: string; exercise?: { name: string }; target_sets?: number; target_reps?: string | number; target_weight?: string | number }) => ({
                                 exercise_id: e.exercise_id,
                                 exercise_name: e.exercise?.name || 'Unknown',
                                 target_sets: e.target_sets || 3,
-                                target_reps: e.target_reps || 10,
+                                target_reps: e.target_reps ? String(e.target_reps) : '10',
                                 target_weight: e.target_weight || 0
                             })));
                         }
@@ -473,9 +532,10 @@ function CreateWorkoutForm() {
             // Delete old exercises
             await supabase.from('routine_exercises').delete().eq('routine_id', editId);
         } else {
+            if (!user) return;
             const { data: routine, error: routineErr } = await supabase
                 .from('routines')
-                .insert({ user_id: DEMO_USER_ID, name: name.trim(), description: description.trim() || null, schedule })
+                .insert({ user_id: user.id, name: name.trim(), description: description.trim() || null, schedule })
                 .select()
                 .single();
 
@@ -484,7 +544,7 @@ function CreateWorkoutForm() {
         }
 
         // Insert routine_exercises
-        const allExercises: { exercise_id: string; order_index: number; target_sets: number; target_reps: string | number; target_weight: number | null }[] = [];
+        const allExercises: { exercise_id: string; order_index: number; target_sets: number; target_reps: string | number; target_weight: string | number | null }[] = [];
 
         if (mode === 'simple') {
             simpleExercises.forEach((e, idx) => allExercises.push({
@@ -732,6 +792,7 @@ function CreateWorkoutForm() {
 }
 
 export default function CreateWorkoutPage() {
+
     return (
         <Suspense fallback={<div style={{ padding: 24, color: '#8A91A8', textAlign: 'center' }}>Loading editor...</div>}>
             <CreateWorkoutForm />

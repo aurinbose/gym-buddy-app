@@ -2,27 +2,37 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Dumbbell, Trash2, Play, ChevronDown, ChevronUp, Calendar, Edit2 } from 'lucide-react';
+import { Plus, Dumbbell, Trash2, Play, ChevronDown, ChevronUp, Calendar, Edit2, Download } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { supabase } from '@/lib/supabase';
 import { Routine, RoutineDay } from '@/types';
-
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+import { downloadRoutinePDF } from '@/lib/pdfGenerator';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function WorkoutsPage() {
     const [routines, setRoutines] = useState<Routine[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleting, setDeleting] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const { user, loading: authLoading } = useAuth();
+    const router = useRouter();
 
-    useEffect(() => { fetchRoutines(); }, []);
+    useEffect(() => {
+        if (!authLoading && !user) router.push('/login');
+    }, [user, authLoading, router]);
+
+    useEffect(() => { 
+        if (user) fetchRoutines(); 
+    }, [user]);
 
     async function fetchRoutines() {
+        if (!user) return;
         const { data } = await supabase
             .from('routines')
             .select('*')
-            .eq('user_id', DEMO_USER_ID)
+            .eq('user_id', user.id)
             .order('created_at', { ascending: false });
         if (data) setRoutines(data as Routine[]);
         setLoading(false);
@@ -157,6 +167,19 @@ export default function WorkoutsPage() {
                                                         {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                                                     </button>
                                                 )}
+                                                
+                                                <button
+                                                    onClick={() => downloadRoutinePDF(routine)}
+                                                    style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                        background: 'none', border: 'none',
+                                                        color: '#8A91A8', fontSize: '0.72rem', fontWeight: 600,
+                                                        padding: '7px 12px', cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <Download size={11} />
+                                                    Export PDF
+                                                </button>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
