@@ -9,11 +9,45 @@ import { WorkoutLog, Routine } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
+// ── helpers ──────────────────────────────────────────────────────────
+function calculateStreak(startedAts: string[]): number {
+  if (startedAts.length === 0) return 0;
+
+  // Unique calendar dates (local)
+  const uniqueDates = new Set(
+    startedAts.map(d => {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+    })
+  );
+
+  const toKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  // Streak is dead if nothing logged today or yesterday
+  if (!uniqueDates.has(toKey(today)) && !uniqueDates.has(toKey(yesterday))) return 0;
+
+  // Walk backwards from today
+  let streak = 0;
+  const cursor = uniqueDates.has(toKey(today)) ? new Date(today) : new Date(yesterday);
+
+  while (uniqueDates.has(toKey(cursor))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+// ─────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [recentWorkouts, setRecentWorkouts] = useState<WorkoutLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalWorkouts, setTotalWorkouts] = useState(0);
+  const [streak, setStreak] = useState(0);
 
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -28,14 +62,17 @@ export default function DashboardPage() {
     async function fetchData() {
       if (!user) return;
       try {
-        const [routinesRes, workoutsRes] = await Promise.all([
+        const [routinesRes, workoutsRes, allDatesRes] = await Promise.all([
           supabase.from('routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3),
           supabase.from('workout_logs').select('*, routine:routines(name)').eq('user_id', user.id).order('started_at', { ascending: false }).limit(5),
+          // Lightweight query — only the timestamp column, all rows
+          supabase.from('workout_logs').select('started_at').eq('user_id', user.id),
         ]);
         if (routinesRes.data) setRoutines(routinesRes.data);
-        if (workoutsRes.data) {
-          setRecentWorkouts(workoutsRes.data);
-          setTotalWorkouts(workoutsRes.data.length);
+        if (workoutsRes.data) setRecentWorkouts(workoutsRes.data);
+        if (allDatesRes.data) {
+          setTotalWorkouts(allDatesRes.data.length);
+          setStreak(calculateStreak(allDatesRes.data.map(r => r.started_at)));
         }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -144,8 +181,8 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Streak"
-          value="—"
-          subtitle="Days in a row"
+          value={loading ? '—' : streak}
+          subtitle={streak === 1 ? 'Day in a row 🔥' : streak > 1 ? 'Days in a row 🔥' : 'Start your streak!'}
           icon={TrendingUp}
           color="pink"
         />
