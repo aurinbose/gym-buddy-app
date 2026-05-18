@@ -9,7 +9,103 @@ import { WorkoutLog, Routine } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
-// ── helpers ──────────────────────────────────────────────────────────
+// ── WorkoutCalendar ───────────────────────────────────────────────────
+function WorkoutCalendar({ dates }: { dates: string[] }) {
+  const WEEKS = 10;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Count workouts per day
+  const countMap: Record<string, number> = {};
+  dates.forEach(d => {
+    const dt = new Date(d);
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    countMap[key] = (countMap[key] || 0) + 1;
+  });
+
+  // Find Monday of the week containing today
+  const dayOfWeek = today.getDay(); // 0=Sun
+  const daysToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - daysToMon);
+
+  // Start WEEKS ago from thisMonday
+  const startDate = new Date(thisMonday);
+  startDate.setDate(thisMonday.getDate() - (WEEKS - 1) * 7);
+
+  // Build WEEKS columns × 7 rows
+  const weeks: { key: string; isFuture: boolean; count: number }[][] = [];
+  for (let w = 0; w < WEEKS; w++) {
+    const col: { key: string; isFuture: boolean; count: number }[] = [];
+    for (let d = 0; d < 7; d++) {
+      const cell = new Date(startDate);
+      cell.setDate(startDate.getDate() + w * 7 + d);
+      cell.setHours(0, 0, 0, 0);
+      const key = `${cell.getFullYear()}-${String(cell.getMonth() + 1).padStart(2, '0')}-${String(cell.getDate()).padStart(2, '0')}`;
+      col.push({ key, isFuture: cell > today, count: countMap[key] || 0 });
+    }
+    weeks.push(col);
+  }
+
+  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  function cellColor(count: number, isFuture: boolean): string {
+    if (isFuture) return '#0D1117';
+    if (count === 0) return '#161B22';
+    if (count === 1) return 'rgba(255,107,53,0.45)';
+    return '#FF6B35';
+  }
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>Activity</h2>
+        <span style={{ fontSize: '0.75rem', color: '#5A6175' }}>Last {WEEKS} weeks</span>
+      </div>
+      <div className="card" style={{ padding: '14px 12px', borderRadius: 20 }}>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {/* Day labels column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginRight: 4 }}>
+            {dayLabels.map((l, i) => (
+              <div key={i} style={{ height: 12, fontSize: '0.55rem', color: '#5A6175', lineHeight: '12px', fontWeight: 600 }}>{l}</div>
+            ))}
+          </div>
+          {/* Week columns */}
+          {weeks.map((col, wi) => (
+            <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+              {col.map((cell) => {
+                const isToday = cell.key === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                return (
+                  <div
+                    key={cell.key}
+                    title={`${cell.key}${cell.count > 0 ? ` · ${cell.count} workout${cell.count > 1 ? 's' : ''}` : ''}`}
+                    style={{
+                      height: 12, borderRadius: 3,
+                      background: cellColor(cell.count, cell.isFuture),
+                      outline: isToday ? '1.5px solid #FF6B35' : 'none',
+                      outlineOffset: 1,
+                      transition: 'background 0.15s',
+                    }}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        {/* Legend */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, justifyContent: 'flex-end' }}>
+          <span style={{ fontSize: '0.62rem', color: '#5A6175' }}>None</span>
+          {['#161B22', 'rgba(255,107,53,0.45)', '#FF6B35'].map((c, i) => (
+            <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: c }} />
+          ))}
+          <span style={{ fontSize: '0.62rem', color: '#5A6175' }}>Active</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── helpers ───────────────────────────────────────────────────────────
 function calculateStreak(startedAts: string[]): number {
   if (startedAts.length === 0) return 0;
 
@@ -48,6 +144,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [totalWorkouts, setTotalWorkouts] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [allDates, setAllDates] = useState<string[]>([]);
 
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -71,8 +168,10 @@ export default function DashboardPage() {
         if (routinesRes.data) setRoutines(routinesRes.data);
         if (workoutsRes.data) setRecentWorkouts(workoutsRes.data);
         if (allDatesRes.data) {
-          setTotalWorkouts(allDatesRes.data.length);
-          setStreak(calculateStreak(allDatesRes.data.map(r => r.started_at)));
+          const dateStrings = allDatesRes.data.map((r: { started_at: string }) => r.started_at);
+          setTotalWorkouts(dateStrings.length);
+          setStreak(calculateStreak(dateStrings));
+          setAllDates(dateStrings);
         }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -187,6 +286,9 @@ export default function DashboardPage() {
           color="pink"
         />
       </div>
+
+      {/* Activity Calendar */}
+      {!loading && <WorkoutCalendar dates={allDates} />}
 
       {/* Recent Workouts */}
       <div style={{ marginBottom: 20 }}>

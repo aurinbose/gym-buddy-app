@@ -10,8 +10,10 @@ import { Exercise } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
-interface ProgressEntry { workout_date: string; max_weight: number; total_volume: number; total_reps: number; sets_count: number; }
-interface ExerciseProgress { exercise: Exercise; entries: ProgressEntry[]; bestWeight: number; totalVolume: number; }
+interface ProgressEntry { workout_date: string; max_weight: number; total_volume: number; total_reps: number; sets_count: number; est_1rm: number; }
+interface ExerciseProgress { exercise: Exercise; entries: ProgressEntry[]; bestWeight: number; totalVolume: number; best1RM: number; }
+
+type ChartMetric = 'weight' | 'volume' | '1rm';
 
 export default function ProgressPage() {
     const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -19,6 +21,7 @@ export default function ProgressPage() {
     const [progress, setProgress] = useState<ExerciseProgress | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadingProgress, setLoadingProgress] = useState(false);
+    const [metric, setMetric] = useState<ChartMetric>('weight');
     const { user, loading: authLoading, profile } = useAuth();
     const router = useRouter();
 
@@ -52,30 +55,45 @@ export default function ProgressPage() {
 
         const { data: logsData } = await supabase.from('workout_logs').select('id, started_at').eq('user_id', user.id).order('started_at', { ascending: true });
         const logIds = logsData?.map((l) => l.id) || [];
-        if (logIds.length === 0) { setProgress({ exercise, entries: [], bestWeight: 0, totalVolume: 0 }); setLoadingProgress(false); return; }
+        if (logIds.length === 0) { setProgress({ exercise, entries: [], bestWeight: 0, totalVolume: 0, best1RM: 0 }); setLoadingProgress(false); return; }
 
         const { data: setsData } = await supabase.from('workout_sets').select('*').eq('exercise_id', exerciseId).in('workout_log_id', logIds);
-        const byLog: Record<string, { maxWeight: number; totalReps: number; totalVolume: number; setsCount: number }> = {};
+        const byLog: Record<string, { maxWeight: number; totalReps: number; totalVolume: number; setsCount: number; est1rm: number }> = {};
 
         logsData?.forEach((log) => {
-            const logSets = setsData?.filter((s) => s.workout_log_id === log.id) || [];
+            const logSets = setsData?.filter((s: { workout_log_id: string; exercise_id: string; set_number: number; reps: number | null; weight: number | null }) => s.workout_log_id === log.id) || [];
             if (logSets.length === 0) return;
             const date = new Date(log.started_at).toISOString().split('T')[0];
+            const best1rmInSession = Math.max(...logSets.map((s) => {
+                const w = Number(s.weight) || 0;
+                const r = Number(s.reps) || 0;
+                return r > 0 ? w * (1 + r / 30) : 0;
+            }));
             byLog[date] = {
                 maxWeight: Math.max(...logSets.map((s) => Number(s.weight) || 0)),
                 totalReps: logSets.reduce((sum, s) => sum + (Number(s.reps) || 0), 0),
                 totalVolume: logSets.reduce((sum, s) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0), 0),
                 setsCount: logSets.length,
+                est1rm: Math.round(best1rmInSession * 10) / 10,
             };
         });
 
         const entries: ProgressEntry[] = Object.entries(byLog).map(([date, data]) => ({
             workout_date: date, max_weight: data.maxWeight, total_volume: data.totalVolume,
-            total_reps: data.totalReps, sets_count: data.setsCount,
+            total_reps: data.totalReps, sets_count: data.setsCount, est_1rm: data.est1rm,
         }));
-        setProgress({ exercise, entries, bestWeight: Math.max(...entries.map((e) => e.max_weight), 0), totalVolume: entries.reduce((sum, e) => sum + e.total_volume, 0) });
+        const best1RM = Math.max(...entries.map((e) => e.est_1rm), 0);
+        setProgress({ exercise, entries, bestWeight: Math.max(...entries.map((e) => e.max_weight), 0), totalVolume: entries.reduce((sum, e) => sum + e.total_volume, 0), best1RM });
         setLoadingProgress(false);
     }
+
+    const unit = profile?.weight_unit || 'kg';
+    const metricColor: Record<ChartMetric, string> = { weight: '#FF6B35', volume: '#C8FF00', '1rm': '#A78BFA' };
+    const metricLabel: Record<ChartMetric, string> = { weight: 'Max Weight', volume: 'Volume', '1rm': 'Est. 1RM' };
+    const chartData = progress?.entries.map((e: ProgressEntry) => ({
+        date: new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        value: metric === 'weight' ? e.max_weight : metric === 'volume' ? e.total_volume : e.est_1rm,
+    })) ?? [];
 
     return (
         <div style={{ padding: '0 16px 100px' }}>
@@ -108,8 +126,8 @@ export default function ProgressPage() {
                             {/* Stats row */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                                 {[
-                                    { label: 'Best Weight', value: progress.bestWeight > 0 ? `${progress.bestWeight}kg` : '—', icon: TrendingUp, color: '#FF6B35' },
-                                    { label: 'Total Volume', value: progress.totalVolume > 0 ? `${(progress.totalVolume / 1000).toFixed(1)}t` : '—', icon: BarChart3, color: '#C8FF00' },
+                                    { label: 'Best Weight', value: progress.bestWeight > 0 ? `${progress.bestWeight}${profile?.weight_unit || 'kg'}` : '—', icon: TrendingUp, color: '#FF6B35' },
+                                    { label: 'Est. 1RM', value: progress.best1RM > 0 ? `${progress.best1RM}${profile?.weight_unit || 'kg'}` : '—', icon: BarChart3, color: '#C8FF00' },
                                     { label: 'Sessions', value: progress.entries.length, icon: Dumbbell, color: '#60A5FA' },
                                 ].map(({ label, value, icon: Icon, color }) => (
                                     <div key={label} className="card" style={{ padding: '14px 12px', borderRadius: 18, textAlign: 'center' }}>
@@ -122,35 +140,55 @@ export default function ProgressPage() {
                                 ))}
                             </div>
 
+                            {/* Metric switcher */}
+                            <div style={{ display: 'flex', background: '#161B22', borderRadius: 14, padding: 4, gap: 4, border: '1px solid #252B36' }}>
+                                {([
+                                    { key: 'weight' as ChartMetric, label: 'Max Weight' },
+                                    { key: 'volume' as ChartMetric, label: 'Volume' },
+                                    { key: '1rm' as ChartMetric, label: 'Est. 1RM' },
+                                ] as { key: ChartMetric; label: string }[]).map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setMetric(key)}
+                                        style={{
+                                            flex: 1, padding: '8px 0', borderRadius: 10, border: 'none',
+                                            cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                                            background: metric === key ? '#FF6B35' : 'transparent',
+                                            color: metric === key ? '#fff' : '#8A91A8',
+                                            transition: 'all 0.18s',
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+
                             {/* Chart */}
                             {progress.entries.length > 0 ? (
-                                <div className="card" style={{ padding: 16, borderRadius: 20 }}>
-                                    <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', margin: '0 0 4px' }}>Weight Progression</p>
-                                    <p style={{ fontSize: '0.8rem', color: '#8A91A8', margin: '0 0 16px' }}>{progress.exercise.name}</p>
-                                    <div style={{ height: 200, width: '100%' }}>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={progress.entries.map(e => ({
-                                                date: new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                                weight: e.max_weight
-                                            }))} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#252B36" vertical={false} />
-                                                <XAxis dataKey="date" stroke="#5A6175" tick={{ fill: '#8A91A8', fontSize: 11 }} tickLine={false} axisLine={false} />
-                                                <YAxis stroke="#5A6175" tick={{ fill: '#8A91A8', fontSize: 11 }} tickLine={false} axisLine={false} />
-                                                <Tooltip
-                                                    contentStyle={{ backgroundColor: '#1E2430', border: '1px solid #252B36', borderRadius: 12, color: '#fff' }}
-                                                    itemStyle={{ color: '#FF6B35', fontWeight: 600 }}
-                                                    labelStyle={{ color: '#fff', marginBottom: 4 }}
-                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                    formatter={(value: any) => [`${value} ${profile?.weight_unit || 'kg'}`, 'Max Weight']}
-                                                />
-                                                <Line type="monotone" dataKey="weight" stroke="#FF6B35" strokeWidth={2.5}
-                                                    dot={{ fill: '#0D1117', stroke: '#FF6B35', strokeWidth: 2, r: 4 }}
-                                                    activeDot={{ r: 6, fill: '#FF6B35', stroke: '#0D1117', strokeWidth: 2 }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
+                                    <div className="card" style={{ padding: 16, borderRadius: 20 }}>
+                                        <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', margin: '0 0 4px' }}>{metricLabel[metric]} Progression</p>
+                                        <p style={{ fontSize: '0.8rem', color: '#8A91A8', margin: '0 0 16px' }}>{progress.exercise.name}</p>
+                                        <div style={{ height: 200, width: '100%' }}>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#252B36" vertical={false} />
+                                                    <XAxis dataKey="date" stroke="#5A6175" tick={{ fill: '#8A91A8', fontSize: 11 }} tickLine={false} axisLine={false} />
+                                                    <YAxis stroke="#5A6175" tick={{ fill: '#8A91A8', fontSize: 11 }} tickLine={false} axisLine={false} />
+                                                    <Tooltip
+                                                        contentStyle={{ backgroundColor: '#1E2430', border: '1px solid #252B36', borderRadius: 12, color: '#fff' }}
+                                                        itemStyle={{ color: metricColor[metric], fontWeight: 600 }}
+                                                        labelStyle={{ color: '#fff', marginBottom: 4 }}
+                                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                        formatter={(value: any) => [`${value} ${unit}`, metricLabel[metric]]}
+                                                    />
+                                                    <Line type="monotone" dataKey="value" stroke={metricColor[metric]} strokeWidth={2.5}
+                                                        dot={{ fill: '#0D1117', stroke: metricColor[metric], strokeWidth: 2, r: 4 }}
+                                                        activeDot={{ r: 6, fill: metricColor[metric], stroke: '#0D1117', strokeWidth: 2 }}
+                                                    />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
                                     </div>
-                                </div>
                             ) : (
                                 <div className="card" style={{ padding: 24, borderRadius: 20, textAlign: 'center' }}>
                                     <p style={{ color: '#8A91A8', fontSize: '0.85rem' }}>No sets logged for this exercise yet.</p>

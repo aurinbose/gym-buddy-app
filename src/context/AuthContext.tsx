@@ -55,8 +55,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [session]);
 
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        // Get initial session — in development, auto-sign-in if no session exists
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (!session && process.env.NODE_ENV === 'development') {
+                const devEmail = process.env.NEXT_PUBLIC_DEV_EMAIL;
+                const devPassword = process.env.NEXT_PUBLIC_DEV_PASSWORD;
+                if (devEmail && devPassword && !devEmail.startsWith('your@')) {
+                    const { data } = await supabase.auth.signInWithPassword({
+                        email: devEmail,
+                        password: devPassword,
+                    });
+                    if (data.session) {
+                        setSession(data.session);
+                        setUser(data.session.user);
+                        refreshProfile(data.session);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            }
             setSession(session);
             setUser(session?.user || null);
             refreshProfile(session);

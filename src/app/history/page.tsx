@@ -9,7 +9,17 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
-interface ExerciseData { name: string; }
+interface ExerciseData { name: string; muscle_group: string | null; }
+
+const MUSCLE_COLORS: Record<string, string> = {
+    Chest: '#60A5FA', Back: '#34D399', Shoulders: '#A78BFA',
+    Biceps: '#F472B6', Triceps: '#FB923C', Quads: '#FBBF24',
+    Hamstrings: '#4ADE80', Glutes: '#F87171', Calves: '#38BDF8',
+    Core: '#E879F9', Cardio: '#FF6B35',
+};
+function getMuscleColor(muscle: string): string {
+    return MUSCLE_COLORS[muscle] || '#8A91A8';
+}
 interface SetData { id: string; set_number: number; reps: number; weight: number; exercise_id: string; exercise: ExerciseData; }
 interface WorkoutLog { id: string; name: string; notes: string | null; started_at: string; finished_at: string | null; workout_sets: SetData[]; }
 
@@ -18,6 +28,9 @@ function WorkoutCard({ log, onDelete, deleting }: { log: WorkoutLog; onDelete: (
 
     const dateStr = new Date(log.started_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     const totalVolume = log.workout_sets?.reduce((sum, s) => sum + (s.weight || 0) * (s.reps || 0), 0) || 0;
+    const musclesWorked = [...new Set(
+        log.workout_sets?.map(s => s.exercise?.muscle_group).filter(Boolean) as string[]
+    )];
     const exerciseGroups: Record<string, { exerciseName: string; sets: SetData[] }> = {};
     log.workout_sets?.forEach(set => {
         if (!exerciseGroups[set.exercise_id]) {
@@ -82,6 +95,17 @@ function WorkoutCard({ log, onDelete, deleting }: { log: WorkoutLog; onDelete: (
 
             {expanded && (
                 <div style={{ padding: '0 16px 16px', borderTop: '1px solid #252B36' }}>
+                    {musclesWorked.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingTop: 12 }}>
+                            {musclesWorked.map(m => (
+                                <span key={m} style={{
+                                    fontSize: '0.65rem', fontWeight: 700, padding: '3px 9px',
+                                    borderRadius: 99, background: getMuscleColor(m) + '22',
+                                    color: getMuscleColor(m), border: `1px solid ${getMuscleColor(m)}44`,
+                                }}>{m}</span>
+                            ))}
+                        </div>
+                    )}
                     {log.notes && (
                         <p style={{ fontSize: '0.8rem', color: '#8A91A8', fontStyle: 'italic', padding: '12px 0 8px' }}>
                             &ldquo;{log.notes}&rdquo;
@@ -142,7 +166,7 @@ export default function HistoryPage() {
             if (!user) return;
             const { data, error } = await supabase
                 .from('workout_logs')
-                .select('*, workout_sets(*, exercise:exercises(name))')
+                .select('*, workout_sets(*, exercise:exercises(name, muscle_group))')
                 .eq('user_id', user.id)
                 .order('started_at', { ascending: false });
             if (data && !error) setLogs(data);

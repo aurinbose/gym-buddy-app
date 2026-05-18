@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, MutableRefObject } from 'react';
 import { X, SkipForward } from 'lucide-react';
 
 interface RestTimerProps {
@@ -15,6 +15,9 @@ export default function RestTimer({ visible, initialSeconds = 90, onDismiss }: R
   const [seconds, setSeconds] = useState(initialSeconds);
   const [total, setTotal] = useState(initialSeconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Keep onDismiss in a ref so the interval effect never needs it as a dep
+  const onDismissRef = useRef(onDismiss) as MutableRefObject<() => void>;
+  useEffect(() => { onDismissRef.current = onDismiss; });
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -33,7 +36,7 @@ export default function RestTimer({ visible, initialSeconds = 90, onDismiss }: R
     }
   }, [visible, initialSeconds, clearTimer]);
 
-  // Countdown tick
+  // Countdown tick — onDismiss intentionally omitted from deps (accessed via ref)
   useEffect(() => {
     if (!visible) return;
     clearTimer();
@@ -44,20 +47,20 @@ export default function RestTimer({ visible, initialSeconds = 90, onDismiss }: R
           if (typeof navigator !== 'undefined' && navigator.vibrate) {
             navigator.vibrate([200, 100, 200]);
           }
-          setTimeout(onDismiss, 600);
+          setTimeout(() => onDismissRef.current(), 600);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return clearTimer;
-  }, [visible, onDismiss, clearTimer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, clearTimer]);
 
-  const handlePreset = (s: number) => {
+  const handlePreset = useCallback((s: number) => {
     clearTimer();
     setTotal(s);
     setSeconds(s);
-    // restart tick
     intervalRef.current = setInterval(() => {
       setSeconds(prev => {
         if (prev <= 1) {
@@ -65,13 +68,13 @@ export default function RestTimer({ visible, initialSeconds = 90, onDismiss }: R
           if (typeof navigator !== 'undefined' && navigator.vibrate) {
             navigator.vibrate([200, 100, 200]);
           }
-          setTimeout(onDismiss, 600);
+          setTimeout(() => onDismissRef.current(), 600);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  };
+  }, [clearTimer]);
 
   if (!visible) return null;
 

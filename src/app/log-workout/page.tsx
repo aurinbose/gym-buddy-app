@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, useCallback, useRef } from 'react';
+import { useEffect, useState, Suspense, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Trash2, CheckCircle, ArrowLeft, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -182,10 +182,17 @@ function LogWorkoutForm() {
     });
   }, [user, editId]);
 
+  // Derive a stable primitive that only changes when exercises are added/removed,
+  // NOT when reps/weight values are edited — prevents loadPrevData from firing on every keystroke
+  const exerciseIdsKey = useMemo(
+    () => [...new Set(sets.map(s => s.exercise_id))].join(','),
+    [sets]
+  );
+
   useEffect(() => {
-    const ids = [...new Set(sets.map(s => s.exercise_id))];
-    loadPrevData(ids);
-  }, [sets, loadPrevData]);
+    if (!exerciseIdsKey) return;
+    loadPrevData(exerciseIdsKey.split(','));
+  }, [exerciseIdsKey, loadPrevData]);
 
   // ── set manipulation ────────────────────────────────────────────────
   function addSet(exerciseId: string, exerciseName: string) {
@@ -323,8 +330,15 @@ function LogWorkoutForm() {
     }
   }
 
+  // ── stable dismiss callbacks ────────────────────────────────────────
+  const handleDismissRest = useCallback(() => setRestVisible(false), []);
+  const handleDismissPR = useCallback(() => {
+    setShowPRModal(false);
+    router.push('/history');
+  }, [router]);
+
   // ── render helpers ──────────────────────────────────────────────────
-  const exerciseIds = [...new Set(sets.map(s => s.exercise_id))];
+  const exerciseIds = exerciseIdsKey ? exerciseIdsKey.split(',') : [];
   const inputStyle: React.CSSProperties = {
     background: '#1E2430', border: '1px solid #252B36', borderRadius: 14,
     padding: '12px 16px', color: '#fff', fontSize: '0.9rem', outline: 'none',
@@ -556,17 +570,14 @@ function LogWorkoutForm() {
       <RestTimer
         visible={restVisible}
         initialSeconds={restSeconds}
-        onDismiss={() => setRestVisible(false)}
+        onDismiss={handleDismissRest}
       />
 
       {/* PR Celebration overlay */}
       {showPRModal && (
         <PRCelebration
           prs={newPRs}
-          onDismiss={() => {
-            setShowPRModal(false);
-            router.push('/history');
-          }}
+          onDismiss={handleDismissPR}
         />
       )}
     </>

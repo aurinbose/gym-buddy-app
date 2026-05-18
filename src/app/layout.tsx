@@ -24,7 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className} style={{ background: '#0D1117', margin: 0, padding: 0 }}>
+      <body className={inter.className} style={{ background: '#0D1117', margin: 0, padding: 0 }} suppressHydrationWarning>
         <AuthProvider>
             <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', position: 'relative' }}>
             <main style={{ paddingBottom: 90 }}>
