@@ -63,7 +63,7 @@ function LogWorkoutForm() {
   const [prevData, setPrevData] = useState<PrevData>({});
   const [doneSets, setDoneSets] = useState<Set<string>>(new Set());   // "exerciseId-setNum"
   const [restVisible, setRestVisible] = useState(false);
-  const [restSeconds, setRestSeconds] = useState(90);
+  const [restSeconds] = useState(90);
   const [newPRs, setNewPRs] = useState<PREntry[]>([]);
   const [showPRModal, setShowPRModal] = useState(false);
 
